@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Intelligent Intrusion Detection System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 fw-bold mb-1">Threat Overview Dashboard</h2>
+        <p class="text-muted fs-7 mb-0">Real-time inspection telemetry and security event metrics</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()">
+            <i class="fa-solid fa-trash-can me-1"></i> Reset Logs
+        </button>
+        <a href="/monitor" class="btn btn-sm btn-cyan">
+            <i class="fa-solid fa-play me-1"></i> Launch Live Stream
+        </a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted fs-7 text-uppercase fw-semibold">Flows Inspected</span>
+                    <h3 class="fs-2 fw-bold mt-1 mb-0" id="stat-total">{{ stats.total_inspected }}</h3>
+                </div>
+                <div class="stat-icon bg-cyan-subtle text-cyan"><i class="fa-solid fa-network-wired"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted fs-7 text-uppercase fw-semibold">Threats Detected</span>
+                    <h3 class="fs-2 fw-bold text-danger mt-1 mb-0" id="stat-threats">{{ stats.total_threats }}</h3>
+                </div>
+                <div class="stat-icon bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted fs-7 text-uppercase fw-semibold">Normal Baseline</span>
+                    <h3 class="fs-2 fw-bold text-emerald mt-1 mb-0" id="stat-benign">{{ stats.total_benign }}</h3>
+                </div>
+                <div class="stat-icon bg-emerald-subtle text-emerald"><i class="fa-solid fa-shield-check"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted fs-7 text-uppercase fw-semibold">Quarantined IPs</span>
+                    <h3 class="fs-2 fw-bold text-warning mt-1 mb-0" id="stat-blocked">{{ blocked_count }}</h3>
+                </div>
+                <div class="stat-icon bg-warning-subtle text-warning"><i class="fa-solid fa-ban"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-lg-6">
+        <div class="card bg-surface border-dark-subtle shadow-sm h-100">
+            <div class="card-header bg-transparent border-dark-subtle d-flex justify-content-between align-items-center py-3">
+                <span class="fw-semibold"><i class="fa-solid fa-chart-pie text-cyan me-2"></i>Attack Vectors Breakdown</span>
+                <span class="badge bg-secondary-subtle text-light fs-8">Classification</span>
+            </div>
+            <div class="card-body d-flex justify-content-center align-items-center" style="min-height: 280px;">
+                <canvas id="categoryChart" style="max-height: 260px;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card bg-surface border-dark-subtle shadow-sm h-100">
+            <div class="card-header bg-transparent border-dark-subtle d-flex justify-content-between align-items-center py-3">
+                <span class="fw-semibold"><i class="fa-solid fa-chart-simple text-cyan me-2"></i>Severity Distribution</span>
+                <span class="badge bg-secondary-subtle text-light fs-8">Risk Level</span>
+            </div>
+            <div class="card-body d-flex justify-content-center align-items-center" style="min-height: 280px;">
+                <canvas id="severityChart" style="max-height: 260px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Detection Log -->
+<div class="card bg-surface border-dark-subtle shadow-sm">
+    <div class="card-header bg-transparent border-dark-subtle d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold"><i class="fa-solid fa-list-check text-cyan me-2"></i>Recent Security Events</span>
+        <span class="fs-8 text-muted">Latest 12 records</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead class="table-active fs-8 text-uppercase text-muted">
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Source IP : Port</th>
+                    <th>Destination IP : Port</th>
+                    <th>Proto</th>
+                    <th>Verdict</th>
+                    <th>Severity</th>
+                    <th>Confidence</th>
+                    <th>Source</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="events-tbody" class="font-monospace fs-8">
+                {% if recent_events %}
+                    {% for ev in recent_events %}
+                    <tr>
+                        <td>{{ ev.timestamp }}</td>
+                        <td>{{ ev.src_ip }}:{{ ev.src_port }}</td>
+                        <td>{{ ev.dst_ip }}:{{ ev.dst_port }}</td>
+                        <td><span class="badge bg-secondary">{{ ev.protocol }}</span></td>
+                        <td>
+                            {% if ev.verdict == 'BENIGN' %}
+                                <span class="badge bg-emerald-subtle text-emerald">{{ ev.verdict }}</span>
+                            {% elif ev.verdict == 'QUARANTINED' %}
+                                <span class="badge bg-warning-subtle text-warning">{{ ev.verdict }}</span>
+                            {% else %}
+                                <span class="badge bg-danger-subtle text-danger">{{ ev.verdict }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ev.severity == 'CRITICAL' %}
+                                <span class="badge bg-danger text-light">CRITICAL</span>
+                            {% elif ev.severity == 'HIGH' %}
+                                <span class="badge bg-danger-subtle text-danger">HIGH</span>
+                            {% elif ev.severity == 'MEDIUM' %}
+                                <span class="badge bg-warning-subtle text-warning">MEDIUM</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-light">NORMAL</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ (ev.confidence * 100) | round(1) }}%</td>
+                        <td><span class="text-muted">{{ ev.detector_source }}</span></td>
+                        <td>
+                            {% if ev.is_threat and ev.verdict != 'QUARANTINED' %}
+                            <form method="POST" action="/firewall" class="d-inline">
+                                <input type="hidden" name="action" value="block">
+                                <input type="hidden" name="ip" value="{{ ev.src_ip }}">
+                                <input type="hidden" name="reason" value="{{ ev.verdict }} detected">
+                                <button type="submit" class="btn btn-xs btn-outline-warning">
+                                    <i class="fa-solid fa-ban"></i> Block
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            No events captured yet. Head to <a href="/monitor" class="text-cyan">Live Monitor</a> to stream traffic.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let categoryChart = null;
+    let severityChart = null;
+
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+
+            document.getElementById('stat-total').innerText = data.total_inspected;
+            document.getElementById('stat-threats').innerText = data.total_threats;
+            document.getElementById('stat-benign').innerText = data.total_benign;
+            document.getElementById('stat-blocked').innerText = data.blocked_ips_count;
+
+            updateCharts(data);
+        } catch (e) {
+            console.error('Failed to fetch stats:', e);
+        }
+    }
+
+    function updateCharts(data) {
+        // Category Chart
+        const catLabels = Object.keys(data.verdict_distribution);
+        const catValues = Object.values(data.verdict_distribution);
+
+        if (!categoryChart) {
+            const ctxCat = document.getElementById('categoryChart').getContext('2d');
+            categoryChart = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: catLabels.length ? catLabels : ['None'],
+                    datasets: [{
+                        data: catValues.length ? catValues : [1],
+                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        } else {
+            categoryChart.data.labels = catLabels.length ? catLabels : ['None'];
+            categoryChart.data.datasets[0].data = catValues.length ? catValues : [1];
+            categoryChart.update();
+        }
+
+        // Severity Chart
+        const sevLabels = Object.keys(data.severity_distribution);
+        const sevValues = Object.values(data.severity_distribution);
+
+        if (!severityChart) {
+            const ctxSev = document.getElementById('severityChart').getContext('2d');
+            severityChart = new Chart(ctxSev, {
+                type: 'bar',
+                data: {
+                    labels: sevLabels.length ? sevLabels : ['None'],
+                    datasets: [{
+                        label: 'Flow Count',
+                        data: sevValues.length ? sevValues : [0],
+                        backgroundColor: '#06b6d4',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        } else {
+            severityChart.data.labels = sevLabels.length ? sevLabels : ['None'];
+            severityChart.data.datasets[0].data = sevValues.length ? sevValues : [0];
+            severityChart.update();
+        }
+    }
+
+    async function clearLogs() {
+        if (confirm("Reset current event history and stats?")) {
+            await fetch('/api/clear');
+            location.reload();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadStats);
+</script>
+{% endblock %}

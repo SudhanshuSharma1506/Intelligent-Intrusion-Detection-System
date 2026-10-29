@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Live Monitor | Intelligent Intrusion Detection System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 fw-bold mb-1">Real-Time Traffic Monitor</h2>
+        <p class="text-muted fs-7 mb-0">Live packet flow ingestion and streaming threat evaluation</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <span id="stream-status" class="badge bg-secondary-subtle text-secondary px-3 py-2 fs-7">
+            <i class="fa-solid fa-circle-pause me-1"></i> Stream Paused
+        </span>
+        <button id="toggle-stream-btn" class="btn btn-sm btn-cyan" onclick="toggleStream()">
+            <i class="fa-solid fa-play me-1"></i> Start Stream
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="clearTable()">
+            <i class="fa-solid fa-broom me-1"></i> Clear Feed
+        </button>
+    </div>
+</div>
+
+<!-- Live Summary Ticker -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card py-2 px-3">
+            <span class="text-muted fs-8">STREAM SPEED</span>
+            <div class="fs-5 fw-bold text-light">1 Flow / 1.2s</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card py-2 px-3">
+            <span class="text-muted fs-8">STREAM FLOWS</span>
+            <div class="fs-5 fw-bold text-cyan" id="live-count">0</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card py-2 px-3">
+            <span class="text-muted fs-8">THREATS INTERCEPTED</span>
+            <div class="fs-5 fw-bold text-danger" id="threat-count">0</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card py-2 px-3">
+            <span class="text-muted fs-8">SYSTEM LOAD</span>
+            <div class="fs-5 fw-bold text-emerald">Optimal (< 2%)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Live Stream Feed Table -->
+<div class="card bg-surface border-dark-subtle shadow-sm">
+    <div class="card-header bg-transparent border-dark-subtle d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold">
+            <span class="pulse-dot bg-cyan me-2"></span>Live Packet Flow Stream
+        </span>
+        <span class="fs-8 text-muted">Auto-scrolling stream buffer</span>
+    </div>
+    <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead class="table-active fs-8 text-uppercase text-muted sticky-top">
+                <tr>
+                    <th>Time</th>
+                    <th>Source IP:Port</th>
+                    <th>Dest IP:Port</th>
+                    <th>Proto</th>
+                    <th>Verdict</th>
+                    <th>Severity</th>
+                    <th>Confidence</th>
+                    <th>Inspection Engine</th>
+                    <th>Details</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="stream-tbody" class="font-monospace fs-8">
+                <tr id="empty-row">
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-satellite-dish fs-3 mb-2 d-block text-cyan"></i>
+                        Live stream is currently paused. Click <strong>Start Stream</strong> above to begin flow evaluation.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isStreaming = false;
+    let streamInterval = null;
+    let liveFlows = 0;
+    let liveThreats = 0;
+
+    function toggleStream() {
+        if (isStreaming) {
+            stopStream();
+        } else {
+            startStream();
+        }
+    }
+
+    function startStream() {
+        isStreaming = true;
+        const btn = document.getElementById('toggle-stream-btn');
+        const status = document.getElementById('stream-status');
+
+        btn.innerHTML = '<i class="fa-solid fa-pause me-1"></i> Pause Stream';
+        btn.classList.remove('btn-cyan');
+        btn.classList.add('btn-warning');
+
+        status.className = 'badge bg-emerald-subtle text-emerald px-3 py-2 fs-7';
+        status.innerHTML = '<span class="pulse-dot bg-emerald me-1"></span> Streaming Active';
+
+        const empty = document.getElementById('empty-row');
+        if (empty) empty.remove();
+
+        fetchFlow();
+        streamInterval = setInterval(fetchFlow, 1200);
+    }
+
+    function stopStream() {
+        isStreaming = false;
+        clearInterval(streamInterval);
+
+        const btn = document.getElementById('toggle-stream-btn');
+        const status = document.getElementById('stream-status');
+
+        btn.innerHTML = '<i class="fa-solid fa-play me-1"></i> Start Stream';
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-cyan');
+
+        status.className = 'badge bg-secondary-subtle text-secondary px-3 py-2 fs-7';
+        status.innerHTML = '<i class="fa-solid fa-circle-pause me-1"></i> Stream Paused';
+    }
+
+    async function fetchFlow() {
+        try {
+            const res = await fetch('/api/simulate-flow');
+            const data = await res.json();
+            appendRow(data);
+        } catch (e) {
+            console.error('Error fetching simulated flow:', e);
+        }
+    }
+
+    function appendRow(ev) {
+        liveFlows++;
+        if (ev.is_threat) liveThreats++;
+
+        document.getElementById('live-count').innerText = liveFlows;
+        document.getElementById('threat-count').innerText = liveThreats;
+
+        const tbody = document.getElementById('stream-tbody');
+        const row = document.createElement('tr');
+        row.className = ev.is_threat ? 'table-danger-subtle' : '';
+
+        let badgeClass = 'bg-emerald-subtle text-emerald';
+        if (ev.verdict === 'QUARANTINED') badgeClass = 'bg-warning-subtle text-warning';
+        else if (ev.is_threat) badgeClass = 'bg-danger-subtle text-danger';
+
+        let sevBadge = 'bg-secondary-subtle text-light';
+        if (ev.severity === 'CRITICAL') sevBadge = 'bg-danger text-light';
+        else if (ev.severity === 'HIGH') sevBadge = 'bg-danger-subtle text-danger';
+        else if (ev.severity === 'MEDIUM') sevBadge = 'bg-warning-subtle text-warning';
+
+        row.innerHTML = `
+            <td>${ev.timestamp.split(' ')[1]}</td>
+            <td>${ev.src_ip}:${ev.src_port}</td>
+            <td>${ev.dst_ip}:${ev.dst_port}</td>
+            <td><span class="badge bg-secondary">${ev.protocol}</span></td>
+            <td><span class="badge ${badgeClass}">${ev.verdict}</span></td>
+            <td><span class="badge ${sevBadge}">${ev.severity}</span></td>
+            <td>${(ev.confidence * 100).toFixed(1)}%</td>
+            <td><span class="text-muted">${ev.detector_source}</span></td>
+            <td class="text-truncate" style="max-width: 180px;" title="${ev.explanation}">${ev.explanation}</td>
+            <td>
+                ${ev.is_threat && ev.verdict !== 'QUARANTINED' ? `
+                    <form method="POST" action="/firewall" class="d-inline">
+                        <input type="hidden" name="action" value="block">
+                        <input type="hidden" name="ip" value="${ev.src_ip}">
+                        <input type="hidden" name="reason" value="${ev.verdict} detected live">
+                        <button type="submit" class="btn btn-xs btn-outline-warning">
+                            <i class="fa-solid fa-ban"></i> Block
+                        </button>
+                    </form>
+                ` : `<span class="text-muted">-</span>`}
+            </td>
+        `;
+
+        tbody.insertBefore(row, tbody.firstChild);
+
+        // Keep maximum 50 rows in DOM
+        if (tbody.children.length > 50) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
+
+    function clearTable() {
+        const tbody = document.getElementById('stream-tbody');
+        tbody.innerHTML = `
+            <tr id="empty-row">
+                <td colspan="10" class="text-center py-5 text-muted">
+                    Feed cleared. Click Start Stream to resume.
+                </td>
+            </tr>
+        `;
+        liveFlows = 0;
+        liveThreats = 0;
+        document.getElementById('live-count').innerText = 0;
+        document.getElementById('threat-count').innerText = 0;
+    }
+</script>
+{% endblock %}
