@@ -4,6 +4,7 @@
 **Author:** [Sudhanshu Sharma](https://github.com/SudhanshuSharma1506)  
 **Domain:** Cybersecurity, Network Security, Applied Machine Learning  
 **Dataset Reference:** Canadian Institute for Cybersecurity (CICIDS2017 Benchmark Flow Distribution)  
+**Documentation:** [Major Project Phase-I Report](docs/phase1-report/REPORT.md) ([PDF](docs/phase1-report/Major_Project_Phase1_Report.pdf) | [DOCX](docs/phase1-report/Major_Project_Phase1_Report.docx))
 
 ---
 
@@ -178,6 +179,8 @@ Intelligent-Intrusion-Detection-System/
 ├── data/
 │   ├── benchmark_dataset.csv   # Synthesized benchmark dataset
 │   └── blocklist.json          # Persistent IP quarantine state
+├── docs/
+│   └── phase1-report/          # Academic project report (PDF, DOCX, Markdown)
 ├── run.py                      # Master execution script
 ├── requirements.txt            # System dependencies
 └── README.md                   # Formal documentation & project specification
