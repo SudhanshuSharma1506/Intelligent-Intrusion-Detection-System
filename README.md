@@ -4,7 +4,6 @@
 **Author:** [Sudhanshu Sharma](https://github.com/SudhanshuSharma1506)  
 **Domain:** Cybersecurity, Network Security, Applied Machine Learning  
 **Dataset Reference:** Canadian Institute for Cybersecurity (CICIDS2017 Benchmark Flow Distribution)  
-**License:** [MIT License](LICENSE)
 
 ---
 
@@ -181,7 +180,6 @@ Intelligent-Intrusion-Detection-System/
 │   └── blocklist.json          # Persistent IP quarantine state
 ├── run.py                      # Master execution script
 ├── requirements.txt            # System dependencies
-├── LICENSE                     # MIT License
 └── README.md                   # Formal documentation & project specification
 ```
 
@@ -245,9 +243,7 @@ Open **`http://127.0.0.1:5000`** in any modern web browser to access the interac
 
 ---
 
-## 📜 Citation & License
-
-This project is released under the **[MIT License](LICENSE)**.
+## 📜 Citation
 
 ```bibtex
 @software{sharma2026iids,
